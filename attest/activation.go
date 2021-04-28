@@ -14,7 +14,6 @@ import (
 
 	// TODO(jsonp): Move activation generation code to internal package.
 	"github.com/google/go-tpm/tpm2/credactivation"
-	"github.com/google/go-tspi/verification"
 )
 
 const (
@@ -215,7 +214,8 @@ func (p *ActivationParameters) Generate() (secret []byte, ec *EncryptedCredentia
 
 	switch p.TPMVersion {
 	case TPMVersion12:
-		ec, err = p.generateChallengeTPM12(rnd, secret)
+        // Don't support any TPM1.2 operations.
+		return nil, nil, fmt.Errorf("TPM version %v not supported", p.TPMVersion)
 	case TPMVersion20:
 		ec, err = p.generateChallengeTPM20(secret)
 	default:
@@ -250,27 +250,3 @@ func (p *ActivationParameters) generateChallengeTPM20(secret []byte) (*Encrypted
 	}, nil
 }
 
-func (p *ActivationParameters) generateChallengeTPM12(rand io.Reader, secret []byte) (*EncryptedCredential, error) {
-	pk, ok := p.EK.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("got EK of type %T, want an RSA key", p.EK)
-	}
-
-	var (
-		cred, encSecret []byte
-		err             error
-	)
-	if p.AK.UseTCSDActivationFormat {
-		cred, encSecret, err = verification.GenerateChallengeEx(pk, p.AK.Public, secret)
-	} else {
-		cred, encSecret, err = generateChallenge12(rand, pk, p.AK.Public, secret)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("challenge generation failed: %v", err)
-	}
-	return &EncryptedCredential{
-		Credential: cred,
-		Secret:     encSecret,
-	}, nil
-}
